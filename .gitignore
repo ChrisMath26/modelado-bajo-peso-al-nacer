@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Entornos
+.venv/
+venv/
+env/
+.conda/
+.env
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+
+# Datos
+data/raw/*
+data/processed/*
+data/geo/*
+data/external/*
+
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/geo/.gitkeep
+!data/external/.gitkeep
+
+# Reportes generados
+reports/figures/*
+reports/tables/*
+
+!reports/figures/.gitkeep
+!reports/tables/.gitkeep
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Tests/cache
+.pytest_cache/
+.coverage
+htmlcov/

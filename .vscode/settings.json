@@ -1,0 +1,8 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+
+    "python.defaultInterpreterPath": "C:\\Users\\Usuario\\.conda\\envs\\proyecto_ml\\python.exe",
+
+    "r.rterm.windows": "C:\\Program Files\\R\\R-4.6.0\\bin\\R.exe"
+}
