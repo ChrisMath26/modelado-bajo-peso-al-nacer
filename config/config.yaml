@@ -1,0 +1,15 @@
+project:
+  name: "Modelado bajo peso al nacer"
+  version: "0.1.0"
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  geo_data: "data/geo"
+  external_data: "data/external"
+  figures: "reports/figures"
+  tables: "reports/tables"
+
+analysis:
+  random_state: 123
+  significance_level: 0.05
