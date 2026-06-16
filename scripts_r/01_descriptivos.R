@@ -9,6 +9,7 @@
 #================================================================
 #Librerías y opciones globales
 #================================================================
+setwd("C:/Users/Usuario/Downloads/proyecto GLM/modelado-bajo-peso-al-nacer")
 # 4 cifras significativas y sin notación científica:
 options(digits = 4, scipen = 999) 
 # cargar librerías: 
@@ -24,6 +25,8 @@ library(reshape2)
 library(GGally)
 library(dplyr)
 library(effectsize)
+library(rcompanion)
+library(patchwork)
 #======================================================================
 # DIRECTORIOS
 #======================================================================
@@ -51,6 +54,7 @@ df <- read_delim(
   delim = ";",
   locale = locale(encoding = "ISO-8859-1")
 )
+
 #======================================================================
 # VERIFICACION INICIAL
 #======================================================================
@@ -80,22 +84,23 @@ variables_cuantitativas <- c(
 
 variables_cualitativas <- c(
   "SIT_PARTO",
-  "SEXO",
-  "PESO",
+  "SEXO_AGRUPADO",
   "BPN",
-  "ATENCION_PARTO_POR",
-  "GESTACION",
-  "TIPO_PARTO",
-  "MULTIPLICIDAD_PARTO",
-  "PERTENENCIA_ETNICA",
-  "TIPO_DOC_MADRE",
-  "GRUPO_QUINQUENAL_MADRE_CALCULADORA",
-  "ESTADO_CONYUGAL_MADRE",
-  "NIVEL_EDUCATIVO_MADRE",
-  "LOCALIDAD_MADRE",
-  "REGIMEN_SEGURIDAD",
-  "NIVEL_EDUCATIVO_PADRE"
+  "ATENCION_PARTO_GRUPO",
+  "GESTACION_AGRUPADA",
+  "TIPO_PARTO_AGRUPADO",
+  "MULTIPLICIDAD_AGRUPADA",
+  "PERTENENCIA_ETNICA_AGRUPADA",
+  "TIPO_DOC_MADRE_AGRUPADO",
+  "ESTADO_CONYUGAL_AGRUPADO",
+  "NIVEL_EDUCATIVO_MADRE_AGRUPADO",
+  "AREA_RESIDENCIA_MADRE",  
+  "REGIMEN_SEGURIDAD_AGRUPADO",
+  "NIVEL_EDUCATIVO_PADRE_AGRUPADO",
+  "APGAR1_AGRUPADO"  
 )
+
+
 
 #======================================================================
 # CONVERSION DE VARIABLES CATEGORICAS A FACTOR
@@ -519,3 +524,281 @@ write.csv(
 # variables que presentan desviaciones extremadamente grandes respecto al promedio poblacional. El número de controles prenatales muestra una asociación secundaria, 
 #mientras que la edad materna, edad paterna y antecedentes reproductivos presentan una contribución marginal. En conjunto, los resultados sugieren que la diferenciación 
 #entre grupos está dominada por factores directamente relacionados con el crecimiento fetal y la prematuridad, más que por características demográficas o reproductivas.
+
+
+#======================================================================
+# VARIABLES CATEGÓRICAS VS BPN
+# CHI-CUADRADO + V DE CRAMER + PERFILES
+#======================================================================
+
+cat("\n")
+cat("====================================================\n")
+cat("CATEGÓRICAS VS BPN\n")
+cat("====================================================\n")
+
+resultado_cramer <- data.frame()
+resultado_perfiles <- list()
+
+#----------------------------------------------------------------------
+# Etiquetas amigables para BPN
+#----------------------------------------------------------------------
+
+df_perfiles <- df %>%
+  mutate(
+    BPN_LABEL = factor(
+      BPN,
+      levels = c(0, 1),
+      labels = c(
+        "Sin bajo peso al nacer",
+        "Bajo peso al nacer"
+      )
+    )
+  )
+
+#======================================================================
+# RECORRER VARIABLES
+#======================================================================
+
+for(v in variables_cualitativas){
+
+  if(v == "BPN"){
+    next
+  }
+
+  cat("\n")
+  cat("====================================================\n")
+  cat("Variable:", v, "\n")
+  cat("====================================================\n")
+
+  #--------------------------------------------------------------------
+  # TABLA DE CONTINGENCIA
+  #--------------------------------------------------------------------
+
+  tc <- table(
+    df_perfiles[[v]],
+    df_perfiles$BPN_LABEL
+  )
+
+  #--------------------------------------------------------------------
+  # CHI-CUADRADO Y V DE CRAMER
+  #--------------------------------------------------------------------
+
+  chi <- suppressWarnings(
+    chisq.test(tc)
+  )
+
+  v_cramer <- rcompanion::cramerV(tc)
+
+  resultado_cramer <- rbind(
+    resultado_cramer,
+    data.frame(
+      variable = v,
+      chi2 = unname(chi$statistic),
+      pvalue = chi$p.value,
+      v_cramer = v_cramer
+    )
+  )
+
+  #--------------------------------------------------------------------
+  # PERFIL FILA
+  # P(BPN | categoría)
+  #--------------------------------------------------------------------
+
+  perfil_fila <- (
+    prop.table(tc, margin = 1) * 100
+  )
+
+  perfil_fila_df <- (
+    as.data.frame.matrix(perfil_fila)
+  )
+
+  perfil_fila_df$categoria <- rownames(
+    perfil_fila_df
+  )
+
+  perfil_fila_df <- perfil_fila_df %>%
+    relocate(categoria)
+
+  cat("\nPERFIL FILA\n")
+
+  print(
+    knitr::kable(
+      perfil_fila_df,
+      digits = 2
+    )
+  )
+
+  #--------------------------------------------------------------------
+  # PERFIL COLUMNA
+  # P(categoría | BPN)
+  #--------------------------------------------------------------------
+
+  perfil_columna <- (
+    prop.table(tc, margin = 2) * 100
+  )
+
+  perfil_columna_df <- (
+    as.data.frame.matrix(perfil_columna)
+  )
+
+  perfil_columna_df$categoria <- rownames(
+    perfil_columna_df
+  )
+
+  perfil_columna_df <- perfil_columna_df %>%
+    relocate(categoria)
+
+  cat("\nPERFIL COLUMNA\n")
+
+  print(
+    knitr::kable(
+      perfil_columna_df,
+      digits = 2
+    )
+  )
+
+  #--------------------------------------------------------------------
+  # GUARDAR RESULTADOS
+  #--------------------------------------------------------------------
+
+  resultado_perfiles[[v]] <- list(
+    tabla = tc,
+    perfil_fila = perfil_fila_df,
+    perfil_columna = perfil_columna_df
+  )
+
+  #--------------------------------------------------------------------
+  # GRÁFICO DE PREVALENCIA DE BPN
+  #--------------------------------------------------------------------
+
+  if(!("Bajo peso al nacer" %in%
+       colnames(perfil_fila_df))){
+    next
+  }
+
+  perfil_plot <- perfil_fila_df %>%
+    select(
+      categoria,
+      `Bajo peso al nacer`
+    ) %>%
+    rename(
+      prevalencia_bpn =
+        `Bajo peso al nacer`
+    ) %>%
+    arrange(
+      desc(prevalencia_bpn)
+    )
+
+  p <- ggplot(
+    perfil_plot,
+    aes(
+      x = reorder(
+        categoria,
+        prevalencia_bpn
+      ),
+      y = prevalencia_bpn
+    )
+  ) +
+    geom_col(
+      fill = "#D73027"
+    ) +
+    geom_text(
+      aes(
+        label = paste0(
+          round(
+            prevalencia_bpn,
+            1
+          ),
+          "%"
+        )
+      ),
+      hjust = -0.15,
+      size = 3.5
+    ) +
+    coord_flip() +
+    theme_minimal() +
+    labs(
+      title = paste(
+        "Prevalencia de BPN por",
+        v
+      ),
+      subtitle = paste(
+        "V de Cramer =",
+        round(v_cramer, 3)
+      ),
+      x = NULL,
+      y = "Prevalencia de BPN (%)"
+    ) +
+    expand_limits(
+      y = max(
+        perfil_plot$prevalencia_bpn
+      ) * 1.15
+    )
+
+  print(p)
+
+  ggsave(
+    filename = file.path(
+      dir_figures,
+      paste0(
+        "prevalencia_bpn_",
+        v,
+        ".png"
+      )
+    ),
+    plot = p,
+    width = 9,
+    height = 6,
+    dpi = 300
+  )
+}
+
+#======================================================================
+# RESUMEN GLOBAL DE V DE CRAMER
+#======================================================================
+
+resultado_cramer <- resultado_cramer %>%
+  arrange(
+    desc(v_cramer)
+  )
+
+cat("\n")
+cat("====================================================\n")
+cat("RESUMEN V DE CRAMER\n")
+cat("====================================================\n")
+
+print(
+  knitr::kable(
+    resultado_cramer,
+    digits = 4
+  )
+)
+
+write.csv(
+  resultado_cramer,
+  file.path(
+    dir_tables,
+    "cramer_v_bpn.csv"
+  ),
+  row.names = FALSE
+)
+
+cat("\n")
+cat("====================================================\n")
+cat("PROCESO FINALIZADO\n")
+cat("====================================================\n")
+
+cat("\nFiguras almacenadas en:\n")
+cat(dir_figures)
+
+
+cat("\n\nTablas almacenadas en:\n")
+cat(dir_tables)
+
+#El análisis bivariado muestra que la estructura del bajo peso al nacer está dominada principalmente por factores obstétricos y neonatales, 
+#especialmente la edad gestacional (V = 0.586), seguida por la multiplicidad del embarazo, el tipo de parto y el APGAR al minuto. 
+#En contraste, las variables sociodemográficas presentan asociaciones débiles, mientras que variables como pertenencia étnica, 
+#sitio de parto o tipo de atención muestran efectos prácticamente nulos. Esto sugiere que la mayor capacidad explicativa del fenómeno 
+#se encuentra en características clínicas y obstétricas directamente relacionadas con el proceso gestacional, más que en factores demográficos considerados de forma aislada.
+
+
